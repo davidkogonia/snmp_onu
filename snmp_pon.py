@@ -1,12 +1,7 @@
 from easysnmp import Session, EasySNMPTimeoutError
 from onu_adress import ip_adress
 from flask import Flask, render_template
-import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-MAX_THREADS = 10
-executor = ThreadPoolExecutor(max_workers=MAX_THREADS)
-print(time.strftime('%X'))
 app = Flask(__name__)
 
 
@@ -63,32 +58,22 @@ class MySnmp:
             pass
         return data
 
-    def get_data(self, ip):
-        snmp = MySnmp(ip)
-        name = snmp.get_name()
-        if name is not None:
-            return {
-                'name': name,
-                'ip': ip,
-                'ports': snmp.get_ports(),
-                'onu_quantity': snmp.get_onu_quantity()
-            }
-
 
 @app.route("/")
 def start():
     html = list()
-    with executor as pool:
-        # Запускаем опросы в пуле потоков
-        future_results = [pool.submit(MySnmp(ip).get_data, ip) for ip in ip_adress()]
-        for future in future_results:
-            result = future.result()
-            if result is not None:
-                html.append(result)
-
+    for i in ip_adress():
+        snmp = MySnmp(i)
+        if snmp.get_name() is not None:
+            html.append({
+                'name': snmp.get_name(),
+                'ip': i,
+                'ports': snmp.get_ports(),
+                'onu_quantity': snmp.get_onu_quantity()
+            })
+            # print(snmp.get_name(), f'ip: {i},', snmp.get_ports(), snmp.get_onu_quantity())
     return render_template('index.html', data=html)
 
 
-if __name__ == '__main__':
-    print(time.strftime('%X'))
-    app.run(threaded=True, debug=True, port=5001, host='0.0.0.0')
+app.run(debug=True, port=5001, host='0.0.0.0')
+print(start())
